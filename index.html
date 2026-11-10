@@ -176,6 +176,8 @@ body.open #drawer{opacity:1;pointer-events:auto;transform:none}
     <details class="panel hz">
       <summary id="sumExplore"></summary>
       <div class="grp">
+        <div class="lab" id="labScene"></div>
+        <div class="row" id="chipScene"></div>
         <div class="lab" id="labSeason"></div>
         <div class="row" id="chipSeason"></div>
         <div class="lab" id="labWx"></div>
@@ -986,7 +988,7 @@ function sceneFor(c){
   c.v=c.k||c.name||'';
   if(c.elev>1200)return'mountain';
   const p=c.pop||0;
-  if(p>500000)return'city';if(p>60000)return'oldtown';if(p>4000)return'village';
+  if(p>500000)return'city';if(p>100000)return'oldtown';if(p>15000)return'village';
   return c.pop==null&&!c.k?'cottage':'cottage';
 }
 const cityName=c=>c.k?t('c_'+c.k):c.name;
@@ -1014,7 +1016,7 @@ function sunTimes(lat,lon,y,m,d,off){
 }
 
 /* ═════════ estado ═════════ */
-let city=null,WX=null,manual=null,seasonOv=null,offsetMin=0,lastOff=0,sunSR=420,sunSS=1140,wxStatus='idle';
+let city=null,WX=null,manual=null,seasonOv=null,sceneOv=null,offsetMin=0,lastOff=0,sunSR=420,sunSS=1140,wxStatus='idle';
 let mode='live',manualMin=720,curMin=720,dragging=false;
 const note=$('note'),cityline=$('cityline');
 const SEASONS=['autumn','winter','spring','summer'];
@@ -1261,7 +1263,7 @@ function cityLife(key,T,h,ky,wx,fr){
 function renderWorld(m,T,live){
   const wx=weatherAt(m,live);S.wx=wx;
   const season=seasonFor();S.season=season;
-  const scene=city.scene||'cottage';S.scene=scene;
+  const scene=sceneOv||city.scene||'cottage';S.scene=scene;
   let cover=season==='winter'?(wx.temp>7?.5:1):0;
   if(wx.snow>0&&wx.temp<4)cover=Math.max(cover,wx.snow>.5?1:.5);
   const ice=season==='winter'&&scene==='cottage';
@@ -1536,7 +1538,8 @@ const ticks=$('ticks');[0,6,12,18,24].forEach(h=>{const s=document.createElement
 
 const mkChip=(parent,label,fn,pressed)=>{const b=document.createElement('button');b.className='chip';b.textContent=label;b.setAttribute('aria-pressed',!!pressed);b.onclick=()=>{[...parent.children].forEach(c=>c.setAttribute('aria-pressed','false'));b.setAttribute('aria-pressed','true');fn()};parent.appendChild(b);return b};
 function buildChips(){
-  const cs=$('chipSeason'),cw=$('chipWx');cs.innerHTML='';cw.innerHTML='';
+  const cs=$('chipSeason'),cw=$('chipWx'),cc=$('chipScene');cs.innerHTML='';cw.innerHTML='';cc.innerHTML='';
+  mkChip(cc,t('auto'),()=>sceneOv=null,!sceneOv);['cottage','village','oldtown','city','coast','desert','mountain'].forEach(k=>{const l=t('l_'+k);mkChip(cc,l[0].toUpperCase()+l.slice(1),()=>sceneOv=k,sceneOv===k)});
   mkChip(cs,t('auto'),()=>seasonOv=null,!seasonOv);SEASONS.forEach(k=>{const l=t('s_'+k);mkChip(cs,l[0].toUpperCase()+l.slice(1),()=>seasonOv=k,seasonOv===k)});
   mkChip(cw,t('real'),()=>manual=null,!manual);Object.keys(PRESETS).forEach(k=>mkChip(cw,t(PRESETS[k].l),()=>manual=PRESETS[k].p()));
 }
@@ -1640,7 +1643,7 @@ async function loadMiniWX(){
 function applyLang(){
   document.documentElement.lang=lang;
   q.placeholder=t('search');$('loc').title=t('myloc');$('loc').setAttribute('aria-label',t('myloc'));
-  $('sumExplore').textContent=t('explore');$('labSeason').textContent=t('season');$('labWx').textContent=t('weather');
+  $('sumExplore').textContent=t('explore');$('labScene').textContent={es:'Escena',en:'Scene',gl:'Escena'}[lang];$('labSeason').textContent=t('season');$('labWx').textContent=t('weather');
   $('hCities').textContent=t('cities');$('hSearch').textContent=t('searchH');$('bNow').textContent=t('now');
   setMode(mode);buildChips();
   $('bLang').textContent=lang.toUpperCase();$('bLang').title=t('lang');
@@ -1766,7 +1769,7 @@ function loop(tm){
     if(l)c=cityBy(l.k);
     else{const f=CITIES.find(x=>x.tz===tz);c=f?Object.assign({},f):{name:(tz.split('/').pop()||'').replace(/_/g,' '),country:'',lat:47,lon:8,tz:tz||'Europe/Zurich'}}
   }
-  c.scene=sceneFor(c);city=c;offsetMin=tzOffsetMin(c.tz,new Date());lastOff=Date.now();setSun();
+  c.scene=sceneFor(c);city=c;if(sceneOv){sceneOv=null;buildChips()}offsetMin=tzOffsetMin(c.tz,new Date());lastOff=Date.now();setSun();
   S.wx=PRESETS.clear.p();S.season=seasonFor();S.L=1;S.act='sleep';S.scene=c.scene;
   buildMinis();makeThumbs();applyLang();
   setCity(c);loadMiniWX();setInterval(loadMiniWX,15*60000);
